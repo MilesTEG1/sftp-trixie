@@ -1,2 +1,10 @@
 .git
 tests
+.gitignore
+*.env
+*.env.*
+compose.env*
+docker-compose*.yaml
+docker-compose*.yml
+config
+data

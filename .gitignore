@@ -1,0 +1,11 @@
+# Fichiers d'environnement locaux contenant des secrets
+.env
+.env.*
+compose.env
+*.local
+
+# Dossiers de données et clés générées en local
+config/
+data/
+*.key
+*.pub

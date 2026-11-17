@@ -56,6 +56,19 @@ docker run \
 
 ### Using Docker Compose:
 
+A ready-to-use [`docker-compose.yaml`](docker-compose.yaml) and [`compose.env.example`](compose.env.example) are provided at the root of this repository.
+
+1. Copy the environment template:
+   ```bash
+   cp compose.env.example .env
+   ```
+2. Start the SFTP service:
+   ```bash
+   docker compose up -d
+   ```
+
+Example `docker-compose.yaml`:
+
 ```yaml
 services:
   sftp:
@@ -63,10 +76,17 @@ services:
     container_name: sftp
     restart: unless-stopped
     ports:
-      - "2222:22"
+      - "${SFTP_PORT:-2222}:22"
     volumes:
-      - <host-dir>/upload:/home/foo/upload
-    command: foo:pass:1001
+      - ./data/upload:/home/${SFTP_USER1:-sftpuser}/upload
+    environment:
+      SFTP_USERS: "${SFTP_USER1:-sftpuser}:${SFTP_PASS1}:e:${SFTP_UID1:-1000}:${SFTP_GID1:-1000}"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/22 && exec 3>&-"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 ```
 
 ### Logging in
