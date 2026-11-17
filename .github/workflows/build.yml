@@ -1,51 +1,116 @@
-name: build
+name: Build and Publish SFTP Images
 
 on:
   schedule:
-    - cron: "0 12 * * *"
+    # Rebuild weekly on Sundays at 04:00 UTC for security patches
+    - cron: '0 4 * * 0'
   push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*.*.*'
     paths-ignore:
-      - "*.md"
-      - "*.txt"
-      - "*.png"
+      - '**.md'
+      - 'LICENSE*'
+      - '.gitignore'
   pull_request:
+    branches:
+      - master
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE*'
+      - '.gitignore'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
 jobs:
-  verify:
+  lint:
+    name: Lint Scripts (ShellCheck)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # for proper signature verification
-
-      - name: Verify signature
-        if: github.repository == 'atmoz/sftp'
-        uses: atmoz/git-verify-ref@master
-        with:
-          import-github-users: atmoz
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@2.0.0
         with:
           ignore_paths: tests/shunit2
 
-  alpine:
-    needs: verify
-    uses: ./.github/workflows/build-image.yml
-    with:
-      containerfile: Dockerfile-alpine
-      image: "$GITHUB_REPOSITORY"
-      tag: alpine
-      update-check: "apk update >/dev/null && apk list --upgradable"
-    secrets: inherit
+  build-and-push:
+    name: Build & Push (${{ matrix.flavor }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: trixie
+            file: Dockerfile
+            tags: |
+              type=raw,value=latest,enable={{is_default_branch}}
+              type=raw,value=trixie,enable={{is_default_branch}}
+              type=ref,event=branch
+              type=ref,event=pr
+              type=semver,pattern={{version}}
+              type=sha,format=short
+          - flavor: alpine
+            file: Dockerfile-alpine
+            tags: |
+              type=raw,value=alpine,enable={{is_default_branch}}
+              type=ref,event=branch,suffix=-alpine
+              type=ref,event=pr,suffix=-alpine
+              type=semver,pattern={{version}},suffix=-alpine
+              type=sha,format=short,suffix=-alpine
 
-  debian:
-    needs: verify
-    uses: ./.github/workflows/build-image.yml
-    with:
-      containerfile: Dockerfile
-      image: "$GITHUB_REPOSITORY"
-      tag: debian
-      update-check: "apt-get update >/dev/null && apt-get upgrade -s | grep '^Inst' || true"
-    secrets: inherit
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve lower-case image name
+        run: |
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: ${{ matrix.tags }}
+          labels: |
+            org.opencontainers.image.title=sftp-trixie (${{ matrix.flavor }})
+            org.opencontainers.image.description=Secure SFTP server (${{ matrix.flavor }}) with multi-architecture support
+            org.opencontainers.image.vendor=MilesTEG1
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.flavor }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.flavor }}
