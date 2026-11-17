@@ -34,10 +34,15 @@ IFS=':' read -ra args <<< "$1"
 
 skipIndex=0
 chpasswdOptions=""
-useraddOptions=(--no-user-group --badname)
+useraddOptions=(--no-user-group)
 
 user="${args[0]}"; validateArg "username" "$user" "$reUser" || exit 1
 pass="${args[1]}"; validateArg "password" "$pass" "$rePass" || exit 1
+
+# Only add --badname if username contains non-standard characters (e.g. dots, uppercase)
+if [[ ! "$user" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+    useraddOptions+=(--badname)
+fi
 
 if [ "${args[2]}" == "e" ]; then
     chpasswdOptions="-e"
@@ -65,7 +70,8 @@ if [ -n "$gid" ]; then
     useraddOptions+=(--gid "$gid")
 fi
 
-useradd "${useraddOptions[@]}" "$user"
+# Execute useradd, filtering out harmless shadow deprecation warning if --badname was needed
+useradd "${useraddOptions[@]}" "$user" 2> >(grep -v "WARNING: --badname is deprecated" >&2)
 mkdir -p "/home/$user"
 chown root:root "/home/$user"
 chmod 755 "/home/$user"
