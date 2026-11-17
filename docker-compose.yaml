@@ -1,0 +1,57 @@
+# ==============================================================================
+# 🐳 SFTP Server (Debian Trixie) — Docker Compose
+# ==============================================================================
+# 📦 Image        : ghcr.io/milesteg1/sftp-trixie:latest
+# 🎯 Description  : Secure SFTP server based on Debian Trixie (OpenSSH)
+# 🌐 Source       : https://github.com/MilesTEG1/sftp-trixie
+# 🔄 Restart      : unless-stopped
+# ==============================================================================
+
+services:
+  sftp:
+    image: ghcr.io/milesteg1/sftp-trixie:latest
+    container_name: sftp
+    restart: unless-stopped
+
+    # 🔌 Port d'écoute SFTP (exposé sur l'hôte, déporté pour ne pas entrer en conflit avec SSH)
+    ports:
+      - "${SFTP_PORT:-2222}:22"
+
+    volumes:
+      # 🔑 Persistance des clés d'hôte SSH du serveur (évite l'alerte d'empreinte modifiée)
+      # À générer sur l'hôte une seule fois si souhaité :
+      #   mkdir -p ./config
+      #   ssh-keygen -t ed25519 -f ./config/ssh_host_ed25519_key -N ""
+      #   ssh-keygen -t rsa -b 4096 -f ./config/ssh_host_rsa_key -N ""
+      #   chmod 600 ./config/ssh_host_*_key
+      - ./config/ssh_host_ed25519_key:/etc/ssh/ssh_host_ed25519_key
+      - ./config/ssh_host_rsa_key:/etc/ssh/ssh_host_rsa_key
+
+      # ⚙️ Configuration OpenSSH personnalisée (optionnel)
+      # - ./config/sshd_config:/etc/ssh/sshd_config:ro
+
+      # 📁 Données persistées de l'utilisateur chrooté dans /home/<user>/upload
+      - ./data/upload:/home/${SFTP_USER1:-sftpuser}/upload
+
+    environment:
+      # 👥 Déclaration des utilisateurs SFTP
+      # Syntaxe par entrée : user:password[:e][:uid[:gid[:dir1[,dir2]...]]]
+      # Flag ':e:' = mot de passe déjà chiffré/hashé (recommandé)
+      SFTP_USERS: "${SFTP_USER1:-sftpuser}:${SFTP_PASS1:-password}:e:${SFTP_UID1:-1000}:${SFTP_GID1:-1000}"
+
+    # 🩺 Contrôle d'état de santé natif (socket TCP Bash)
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/22 && exec 3>&-"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
