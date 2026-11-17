@@ -1,13 +1,15 @@
-# SFTP
+# SFTP (Debian Trixie & Alpine)
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/atmoz/sftp/build.yml?logo=github) ![GitHub stars](https://img.shields.io/github/stars/atmoz/sftp?logo=github) ![Docker Stars](https://img.shields.io/docker/stars/atmoz/sftp?label=stars&logo=docker) ![Docker Pulls](https://img.shields.io/docker/pulls/atmoz/sftp?label=pulls&logo=docker)
+[![Build and Publish SFTP Images](https://github.com/MilesTEG1/sftp-trixie/actions/workflows/build.yml/badge.svg)](https://github.com/MilesTEG1/sftp-trixie/actions/workflows/build.yml)
 
-![OpenSSH logo](https://raw.githubusercontent.com/atmoz/sftp/master/openssh.png "Powered by OpenSSH")
+![OpenSSH logo](https://raw.githubusercontent.com/MilesTEG1/sftp-trixie/master/openssh.png "Powered by OpenSSH")
 
 # Supported tags and respective `Dockerfile` links
 
-- [`debian`, `latest` (*Dockerfile*)](https://github.com/atmoz/sftp/blob/master/Dockerfile) ![Docker Image Size (debian)](https://img.shields.io/docker/image-size/atmoz/sftp/debian?label=debian&logo=debian&style=plastic)
-- [`alpine` (*Dockerfile*)](https://github.com/atmoz/sftp/blob/master/Dockerfile-alpine) ![Docker Image Size (alpine)](https://img.shields.io/docker/image-size/atmoz/sftp/alpine?label=alpine&logo=Alpine%20Linux&style=plastic)
+- **Registry**: `ghcr.io/milesteg1/sftp-trixie`
+- **Architectures**: `linux/amd64`, `linux/arm64`
+- [`debian`, `trixie`, `latest` (*Dockerfile*)](https://github.com/MilesTEG1/sftp-trixie/blob/master/Dockerfile)
+- [`alpine` (*Dockerfile-alpine*)](https://github.com/MilesTEG1/sftp-trixie/blob/master/Dockerfile-alpine)
 
 # Securely share your files
 
@@ -35,8 +37,8 @@ Easy to use SFTP ([SSH File Transfer Protocol](https://en.wikipedia.org/wiki/SSH
 
 ## Simplest docker run example
 
-```
-docker run -p 22:22 -d atmoz/sftp foo:pass:::upload
+```bash
+docker run -p 22:22 -d ghcr.io/milesteg1/sftp-trixie foo:pass:::upload
 ```
 
 User "foo" with password "pass" can login with sftp and upload files to a folder called "upload". No mounted directories or custom UID/GID. Later you can inspect the files and use `--volumes-from` to mount them somewhere else (or see next example).
@@ -45,22 +47,25 @@ User "foo" with password "pass" can login with sftp and upload files to a folder
 
 Let's mount a directory and set UID:
 
-```
+```bash
 docker run \
     -v <host-dir>/upload:/home/foo/upload \
-    -p 2222:22 -d atmoz/sftp \
+    -p 2222:22 -d ghcr.io/milesteg1/sftp-trixie \
     foo:pass:1001
 ```
 
 ### Using Docker Compose:
 
-```
-sftp:
-    image: atmoz/sftp
-    volumes:
-        - <host-dir>/upload:/home/foo/upload
+```yaml
+services:
+  sftp:
+    image: ghcr.io/milesteg1/sftp-trixie:latest
+    container_name: sftp
+    restart: unless-stopped
     ports:
-        - "2222:22"
+      - "2222:22"
+    volumes:
+      - <host-dir>/upload:/home/foo/upload
     command: foo:pass:1001
 ```
 
@@ -70,16 +75,16 @@ The OpenSSH server runs by default on port 22, and in this example, we are forwa
 
 ## Store users in config
 
-```
+```bash
 docker run \
     -v <host-dir>/users.conf:/etc/sftp/users.conf:ro \
     -v mySftpVolume:/home \
-    -p 2222:22 -d atmoz/sftp
+    -p 2222:22 -d ghcr.io/milesteg1/sftp-trixie
 ```
 
-<host-dir>/users.conf:
+`<host-dir>/users.conf`:
 
-```
+```text
 foo:123:1001:100
 bar:abc:1002:100
 baz:xyz:1003:100
@@ -89,10 +94,10 @@ baz:xyz:1003:100
 
 Add `:e` behind password to mark it as encrypted. Use single quotes if using terminal.
 
-```
+```bash
 docker run \
     -v <host-dir>/share:/home/foo/share \
-    -p 2222:22 -d atmoz/sftp \
+    -p 2222:22 -d ghcr.io/milesteg1/sftp-trixie \
     'foo:$1$0G2g0GSt$ewU0t6GXG15.0hWoOX8X9.:e:1001'
 ```
 
@@ -103,12 +108,12 @@ Tip: you can use this Python code to generate encrypted passwords:
 
 Mount public keys in the user's `.ssh/keys/` directory. All keys are automatically appended to `.ssh/authorized_keys` (you can't mount this file directly, because OpenSSH requires limited file permissions). In this example, we do not provide any password, so the user `foo` can only login with his SSH key.
 
-```
+```bash
 docker run \
     -v <host-dir>/id_rsa.pub:/home/foo/.ssh/keys/id_rsa.pub:ro \
     -v <host-dir>/id_other.pub:/home/foo/.ssh/keys/id_other.pub:ro \
     -v <host-dir>/share:/home/foo/share \
-    -p 2222:22 -d atmoz/sftp \
+    -p 2222:22 -d ghcr.io/milesteg1/sftp-trixie \
     foo::1001
 ```
 
@@ -116,18 +121,18 @@ docker run \
 
 This container will generate new SSH host keys at first run. To avoid that your users get a MITM warning when you recreate your container (and the host keys changes), you can mount your own host keys.
 
-```
+```bash
 docker run \
     -v <host-dir>/ssh_host_ed25519_key:/etc/ssh/ssh_host_ed25519_key \
     -v <host-dir>/ssh_host_rsa_key:/etc/ssh/ssh_host_rsa_key \
     -v <host-dir>/share:/home/foo/share \
-    -p 2222:22 -d atmoz/sftp \
+    -p 2222:22 -d ghcr.io/milesteg1/sftp-trixie \
     foo::1001
 ```
 
 Tip: you can generate your keys with these commands:
 
-```
+```bash
 ssh-keygen -t ed25519 -f ssh_host_ed25519_key < /dev/null
 ssh-keygen -t rsa -b 4096 -f ssh_host_rsa_key < /dev/null
 ```
@@ -141,7 +146,7 @@ See next section for an example.
 
 If you are using `--volumes-from` or just want to make a custom directory available in user's home directory, you can add a script to `/etc/sftp.d/` that bindmounts after container starts.
 
-```
+```bash
 #!/bin/bash
 # File mounted as: /etc/sftp.d/bindmount.sh
 # Just an example (make your own)
@@ -150,7 +155,7 @@ function bindmount() {
     if [ -d "$1" ]; then
         mkdir -p "$2"
     fi
-    mount --bind $3 "$1" "$2"
+    mount --bind "$3" "$1" "$2"
 }
 
 # Remember permissions, you may have to fix them:
@@ -162,19 +167,16 @@ bindmount /data/common /home/peter/common
 bindmount /data/docs /home/peter/docs --read-only
 ```
 
-**NOTE:** Using `mount` requires that your container runs with the `CAP_SYS_ADMIN` capability turned on. [See this answer for more information](https://github.com/atmoz/sftp/issues/60#issuecomment-332909232).
+**NOTE:** Using `mount` requires that your container runs with the `CAP_SYS_ADMIN` capability turned on.
 
 # What's the difference between Debian and Alpine?
 
-The biggest differences are in size and OpenSSH version. [Alpine](https://hub.docker.com/_/alpine/) is 10 times smaller than [Debian](https://hub.docker.com/_/debian/). OpenSSH version can also differ, as it's two different teams maintaining the packages. Debian is generally considered more stable and only bugfixes and security fixes are added after each Debian release (about 2 years). Alpine has a faster release cycle (about 6 months) and therefore newer versions of OpenSSH. As I'm writing this, Debian has version 7.4 while Alpine has version 7.5. Recommended reading: [Comparing Debian vs Alpine for container & Docker apps](https://www.turnkeylinux.org/blog/alpine-vs-debian)
+The biggest differences are in image size and package ecosystem. [Alpine](https://hub.docker.com/_/alpine/) is minimal (musl-libc, busybox), while [Debian](https://hub.docker.com/_/debian/) provides a standard glibc Debian environment (Debian 13 Trixie). Both images are built for `linux/amd64` and `linux/arm64`.
 
-# What version of OpenSSH do I get?
+# Automated builds
 
-It depends on which linux distro and version you choose (see available images at the top). You can see what version you get by checking the distro's packages online. I have provided direct links below for easy access.
+Images are automatically built on GitHub Actions for multi-architecture (`linux/amd64`, `linux/arm64`) and published to GitHub Container Registry (`ghcr.io/milesteg1/sftp-trixie`). A scheduled workflow runs weekly to ensure images include the latest operating system security patches.
 
-- [List of `openssh` packages on Alpine releases](https://pkgs.alpinelinux.org/packages?name=openssh&branch=&repo=main&arch=x86_64)
-- [List of `openssh-server` packages on Debian releases](https://packages.debian.org/search?keywords=openssh-server&searchon=names&exact=1&suite=all&section=main)
+# Acknowledgements / Upstream
 
-# Daily builds
-
-Images are automatically built daily to get the newest version of OpenSSH provided by the package managers.
+This project is a modern fork of [atmoz/sftp](https://github.com/atmoz/sftp) by Adrian Dvergsdal, updated for Debian Trixie, multi-architecture support, and GitHub Container Registry (GHCR).

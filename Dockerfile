@@ -1,5 +1,12 @@
-FROM debian:bookworm
-MAINTAINER Adrian Dvergsdal [atmoz.net]
+FROM debian:trixie
+
+LABEL maintainer="MilesTEG1" \
+      org.opencontainers.image.title="sftp-trixie" \
+      org.opencontainers.image.description="Secure SFTP server based on Debian Trixie" \
+      org.opencontainers.image.authors="MilesTEG1" \
+      org.opencontainers.image.url="https://github.com/MilesTEG1/sftp-trixie" \
+      org.opencontainers.image.source="https://github.com/MilesTEG1/sftp-trixie" \
+      org.opencontainers.image.licenses="GPL-3.0-or-later"
 
 # Steps done in one RUN layer:
 # - Install upgrades and new packages
