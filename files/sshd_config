@@ -1,6 +1,6 @@
 # Secure defaults
 # See: https://stribika.github.io/2015/01/04/secure-secure-shell.html
-Protocol 2
+# Protocol 2 is implicitly enforced in modern OpenSSH (SSH v1 removed)
 HostKey /etc/ssh/ssh_host_ed25519_key
 HostKey /etc/ssh/ssh_host_rsa_key
 
